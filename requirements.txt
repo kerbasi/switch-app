@@ -1,0 +1,10 @@
+# Switch Control App Dependencies
+# Core dependencies
+tkinter  # Usually included with Python installation
+
+# Optional dependencies for enhanced functionality
+pyserial>=3.5  # For Windows serial port detection (optional)
+
+# Development dependencies (optional)
+# pytest>=6.0  # For testing
+# black>=21.0  # For code formatting 

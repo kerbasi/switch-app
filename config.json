@@ -6,9 +6,22 @@
     "power_on_script_path": "/usr/flexfs/TechNvidia/",
     "power_on_script_name": "powerOnMoose.py"
   },
+  "bios_commands": {
+    "enter_bios": "F2",
+    "boot_menu": "F12",
+    "save_exit": "F10",
+    "discard_exit": "ESC",
+    "up_arrow": "\\x1b[A",
+    "down_arrow": "\\x1b[B",
+    "left_arrow": "\\x1b[D",
+    "right_arrow": "\\x1b[C",
+    "enter": "\\r",
+    "escape": "\\x1b"
+  },
   "button_groups": [
     {
       "title": "Screen Control",
+      "description": "Open and close interactive terminal sessions",
       "buttons": [
         {
           "text": "Open Screen",
@@ -23,8 +36,38 @@
       ]
     },
     {
+      "title": "BIOS Navigation",
+      "description": "Send BIOS menu navigation keys",
+      "buttons": [
+        {
+          "text": "Enter BIOS (F2)",
+          "action": "send_bios_key",
+          "key": "F2",
+          "style": { "bg": "#4CAF50", "fg": "white" }
+        },
+        {
+          "text": "Boot Menu (F12)",
+          "action": "send_bios_key",
+          "key": "F12",
+          "style": { "bg": "#2196F3", "fg": "white" }
+        },
+        {
+          "text": "Save & Exit (F10)",
+          "action": "send_bios_key",
+          "key": "F10",
+          "style": { "bg": "#FF9800", "fg": "white" }
+        },
+        {
+          "text": "Discard & Exit (ESC)",
+          "action": "send_bios_key",
+          "key": "ESC",
+          "style": { "bg": "#F44336", "fg": "white" }
+        }
+      ]
+    },
+    {
       "title": "Serial Commands",
-      "description": "Sends commands to the active screen.",
+      "description": "Sends commands to the active screen or serial port",
       "buttons": [
         {
           "text": "Login (root)",
@@ -45,12 +88,24 @@
           "text": "Show ifconfig",
           "action": "send_to_serial",
           "command": "ifconfig"
+        },
+        {
+          "text": "Reboot System",
+          "action": "send_to_serial",
+          "command": "reboot",
+          "style": { "bg": "#FF5722", "fg": "white" }
+        },
+        {
+          "text": "Shutdown System",
+          "action": "send_to_serial",
+          "command": "shutdown -h now",
+          "style": { "bg": "#9C27B0", "fg": "white" }
         }
       ]
     },
     {
       "title": "Local Commands",
-      "description": "Executes commands on this machine.",
+      "description": "Executes commands on this machine",
       "buttons": [
         {
           "text": "Connect eth1",
@@ -62,6 +117,12 @@
           "action": "run_local_command",
           "command": "cd {power_on_script_path} && python3 {power_on_script_name}",
           "style": { "bg": "#007acc", "fg": "white" }
+        },
+        {
+          "text": "Check Serial Ports",
+          "action": "run_local_command",
+          "command": "ls /dev/ttyS* 2>/dev/null || echo 'No serial ports found'",
+          "style": { "bg": "#607D8B", "fg": "white" }
         }
       ]
     }

@@ -5,12 +5,15 @@ A Python GUI application for controlling network switches and devices via RS-232
 ## Features
 
 - **Serial Communication**: Direct RS-232 port control without pyserial dependency
+- **BIOS Menu Control**: Specialized functions for BIOS navigation and configuration
 - **Interactive Terminal**: Screen-based terminal sessions for real-time device interaction
+- **Cross-Platform Support**: Native support for both Linux and Windows systems
 - **GUI Interface**: User-friendly Tkinter-based interface with organized button groups
 - **Configuration-Driven**: JSON-based configuration for easy customization
-- **Multi-Platform**: Support for Linux and Windows systems
 - **Threading**: Non-blocking GUI with threaded command execution
+- **Enhanced Logging**: Timestamped logs with color-coded message levels
 - **Error Handling**: Comprehensive error handling and user feedback
+- **Serial Port Detection**: Automatic detection of available serial ports
 
 ## Prerequisites
 
@@ -33,7 +36,7 @@ A Python GUI application for controlling network switches and devices via RS-232
 2. Ensure Python 3.6+ is installed
 3. Install required dependencies:
    ```bash
-   pip install tkinter
+   pip install -r requirements.txt
    ```
    Note: tkinter is usually included with Python installations
 
@@ -50,9 +53,22 @@ The app uses `config.json` for configuration. Here's the structure:
     "power_on_script_path": "/usr/flexfs/TechNvidia/",
     "power_on_script_name": "powerOnMoose.py"
   },
+  "bios_commands": {
+    "enter_bios": "F2",
+    "boot_menu": "F12",
+    "save_exit": "F10",
+    "discard_exit": "ESC",
+    "up_arrow": "\\x1b[A",
+    "down_arrow": "\\x1b[B",
+    "left_arrow": "\\x1b[D",
+    "right_arrow": "\\x1b[C",
+    "enter": "\\r",
+    "escape": "\\x1b"
+  },
   "button_groups": [
     {
       "title": "Screen Control",
+      "description": "Open and close interactive terminal sessions",
       "buttons": [
         {
           "text": "Open Screen",
@@ -63,6 +79,18 @@ The app uses `config.json` for configuration. Here's the structure:
           "text": "Close Screen",
           "action": "close_screen",
           "style": { "bg": "red", "fg": "white" }
+        }
+      ]
+    },
+    {
+      "title": "BIOS Navigation",
+      "description": "Send BIOS menu navigation keys",
+      "buttons": [
+        {
+          "text": "Enter BIOS (F2)",
+          "action": "send_bios_key",
+          "key": "F2",
+          "style": { "bg": "#4CAF50", "fg": "white" }
         }
       ]
     }
@@ -96,20 +124,20 @@ The application provides three main sections:
 
 ### Button Actions
 
-- **open_screen**: Opens an interactive terminal session using screen
+- **open_screen**: Opens an interactive terminal session using screen (Linux) or PuTTY (Windows)
 - **close_screen**: Closes the active terminal session
 - **send_to_serial**: Sends commands directly to the serial port
 - **run_local_command**: Executes commands on the local system
+- **send_bios_key**: Sends BIOS navigation keys with proper timing
 
 ### Example Commands
 
 The app comes pre-configured with common switch management commands:
 
-- Login as root
-- Kill DHCP client
-- Configure network interfaces
-- Show network configuration
-- Power management operations
+- **BIOS Navigation**: Enter BIOS, Boot Menu, Save/Exit, Discard/Exit
+- **System Commands**: Login as root, Reboot, Shutdown
+- **Network Configuration**: Kill DHCP client, Configure interfaces, Show network status
+- **Power Management**: Power on/off operations
 
 ## Serial Communication
 
