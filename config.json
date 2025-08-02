@@ -1,0 +1,69 @@
+{
+  "settings": {
+    "serial_device": "/dev/ttyS0",
+    "serial_baudrate": "115200",
+    "default_ip_address": "192.168.10.20",
+    "power_on_script_path": "/usr/flexfs/TechNvidia/",
+    "power_on_script_name": "powerOnMoose.py"
+  },
+  "button_groups": [
+    {
+      "title": "Screen Control",
+      "buttons": [
+        {
+          "text": "Open Screen",
+          "action": "open_screen",
+          "style": { "bg": "green", "fg": "white" }
+        },
+        {
+          "text": "Close Screen",
+          "action": "close_screen",
+          "style": { "bg": "red", "fg": "white" }
+        }
+      ]
+    },
+    {
+      "title": "Serial Commands",
+      "description": "Sends commands to the active screen.",
+      "buttons": [
+        {
+          "text": "Login (root)",
+          "action": "send_to_serial",
+          "command": "root"
+        },
+        {
+          "text": "Kill DHCP Client",
+          "action": "send_to_serial",
+          "command": "killall dhclient"
+        },
+        {
+          "text": "Set IP (ma1)",
+          "action": "send_to_serial",
+          "command": "ifconfig ma1 {default_ip_address}"
+        },
+        {
+          "text": "Show ifconfig",
+          "action": "send_to_serial",
+          "command": "ifconfig"
+        }
+      ]
+    },
+    {
+      "title": "Local Commands",
+      "description": "Executes commands on this machine.",
+      "buttons": [
+        {
+          "text": "Connect eth1",
+          "action": "run_local_command",
+          "command": "nmcli device connect eth1"
+        },
+        {
+          "text": "Power On/Off Moose",
+          "action": "run_local_command",
+          "command": "cd {power_on_script_path} && python3 {power_on_script_name}",
+          "style": { "bg": "#007acc", "fg": "white" }
+        }
+      ]
+    }
+  ]
+}
