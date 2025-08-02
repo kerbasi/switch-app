@@ -26,7 +26,7 @@ class App(tk.Tk):
             sys.exit(1)
 
         self.title("Port Control Interface")
-        self.geometry("800x600")
+        self.geometry("1000x700")
 
         self.default_font = font.nametofont("TkDefaultFont")
         self.default_font.configure(family="Helvetica", size=10)
@@ -73,8 +73,36 @@ class App(tk.Tk):
             return ports
 
     def _create_widgets(self):
-        controls_frame = tk.Frame(self, padx=10, pady=10)
-        controls_frame.pack(side=tk.LEFT, fill=tk.Y, anchor='n')
+        # Main container for controls
+        controls_container = tk.Frame(self, padx=10, pady=10)
+        controls_container.pack(side=tk.LEFT, fill=tk.Y, anchor='n')
+
+        # Create a canvas with scrollbar for controls
+        canvas = tk.Canvas(controls_container, width=300, height=500)
+        scrollbar = tk.Scrollbar(controls_container, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Pack the canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Bind mouse wheel to scroll
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # Add a status bar at the bottom
+        self.status_bar = tk.Label(self, text="Ready", bd=1, relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
         output_frame = tk.Frame(self, padx=10, pady=10)
         output_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -86,13 +114,17 @@ class App(tk.Tk):
         self.output_text.tag_config("WARNING", foreground="orange")
         
         for group in self.config.get('button_groups', []):
-            group_frame = tk.LabelFrame(controls_frame, text=group['title'], padx=10, pady=10)
+            group_frame = tk.LabelFrame(scrollable_frame, text=group['title'], padx=10, pady=10)
             group_frame.pack(fill=tk.X, pady=5)
 
             if 'description' in group:
-                tk.Label(group_frame, text=group['description'], wraplength=200, justify='left', fg='gray').pack(fill=tk.X, pady=(0,5))
+                tk.Label(group_frame, text=group['description'], wraplength=250, justify='left', fg='gray').pack(fill=tk.X, pady=(0,5))
 
-            for btn_config in group['buttons']:
+            # Create a frame for buttons with better organization
+            buttons_frame = tk.Frame(group_frame)
+            buttons_frame.pack(fill=tk.X, expand=True)
+
+            for i, btn_config in enumerate(group['buttons']):
                 action = btn_config.get('action')
                 callback = None
                 
@@ -112,7 +144,15 @@ class App(tk.Tk):
 
                 style = btn_config.get('style', {})
                 if callback:
-                    tk.Button(group_frame, text=btn_config['text'], command=callback, **style).pack(fill=tk.X, pady=2)
+                    # Organize buttons in rows of 2 for better space utilization
+                    row = i // 2
+                    col = i % 2
+                    btn = tk.Button(buttons_frame, text=btn_config['text'], command=callback, **style)
+                    btn.grid(row=row, column=col, sticky='ew', padx=2, pady=2)
+            
+            # Configure grid weights for even button distribution
+            buttons_frame.grid_columnconfigure(0, weight=1)
+            buttons_frame.grid_columnconfigure(1, weight=1)
     
     def _format_command(self, command_template):
         return command_template.format(**self.config['settings'])
@@ -121,6 +161,15 @@ class App(tk.Tk):
         timestamp = time.strftime("%H:%M:%S")
         self.output_text.insert(tk.END, f"[{timestamp}] {message}\n", level.upper())
         self.output_text.see(tk.END)
+        
+        # Update status bar with the last message
+        if hasattr(self, 'status_bar'):
+            self.status_bar.config(text=f"Last: {message[:50]}{'...' if len(message) > 50 else ''}")
+
+    def update_status(self, message):
+        """Update the status bar with a custom message"""
+        if hasattr(self, 'status_bar'):
+            self.status_bar.config(text=message)
 
     def run_in_thread(self, target_func, *args):
         thread = threading.Thread(target=target_func, args=args)
@@ -206,6 +255,8 @@ class App(tk.Tk):
         if self.screen_process and self.screen_process.poll() is None:
             if messagebox.askyesno("Exit", "An active screen session is running. Close it before exiting?"):
                 self.close_screen()
+        # Unbind mouse wheel to prevent memory leaks
+        self.unbind_all("<MouseWheel>")
         self.destroy()
 
 if __name__ == "__main__":
