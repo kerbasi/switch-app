@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import tkinter as tk
-from tkinter import scrolledtext, font, messagebox, ttk
+from tkinter import scrolledtext, font, messagebox, ttk, simpledialog
 import subprocess
 import threading
 import json
@@ -9,6 +9,169 @@ import sys
 import os
 import time
 import glob
+
+class AddCommandDialog:
+    def __init__(self, parent, unit_type, group_title):
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(f"Add New Command - {group_title}")
+        self.dialog.geometry("500x400")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self.unit_type = unit_type
+        self.group_title = group_title
+        self.result = None
+        
+        self._create_widgets()
+        
+        # Center the dialog
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (400 // 2)
+        self.dialog.geometry(f"500x400+{x}+{y}")
+        
+    def _create_widgets(self):
+        # Main frame
+        main_frame = tk.Frame(self.dialog, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Button text
+        tk.Label(main_frame, text="Button Text:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.button_text = tk.Entry(main_frame, width=50)
+        self.button_text.pack(fill=tk.X, pady=(0, 15))
+        
+        # Action type
+        tk.Label(main_frame, text="Action Type:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.action_var = tk.StringVar(value="send_to_serial")
+        action_frame = tk.Frame(main_frame)
+        action_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        tk.Radiobutton(action_frame, text="Send to Serial", variable=self.action_var, 
+                      value="send_to_serial").pack(side=tk.LEFT, padx=(0, 20))
+        tk.Radiobutton(action_frame, text="Run Local Command", variable=self.action_var, 
+                      value="run_local_command").pack(side=tk.LEFT)
+        
+        # Command
+        tk.Label(main_frame, text="Command:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.command_text = tk.Text(main_frame, height=4, width=50)
+        self.command_text.pack(fill=tk.X, pady=(0, 15))
+        
+        # Style options
+        style_frame = tk.LabelFrame(main_frame, text="Button Style (Optional)", padx=10, pady=10)
+        style_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        # Background color
+        tk.Label(style_frame, text="Background Color:").pack(anchor="w")
+        self.bg_color = tk.Entry(style_frame, width=20)
+        self.bg_color.pack(anchor="w", pady=(0, 5))
+        self.bg_color.insert(0, "#f0f0f0")
+        
+        # Text color
+        tk.Label(style_frame, text="Text Color:").pack(anchor="w")
+        self.fg_color = tk.Entry(style_frame, width=20)
+        self.fg_color.pack(anchor="w", pady=(0, 5))
+        self.fg_color.insert(0, "black")
+        
+        # Buttons
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        tk.Button(button_frame, text="Add Command", command=self._add_command, 
+                 bg="green", fg="white", width=15).pack(side=tk.RIGHT, padx=(10, 0))
+        tk.Button(button_frame, text="Cancel", command=self._cancel, 
+                 bg="red", fg="white", width=15).pack(side=tk.RIGHT)
+        
+    def _add_command(self):
+        button_text = self.button_text.get().strip()
+        command = self.command_text.get("1.0", tk.END).strip()
+        action = self.action_var.get()
+        
+        if not button_text or not command:
+            messagebox.showerror("Error", "Button text and command are required!")
+            return
+            
+        # Create style dict if colors are specified
+        style = {}
+        if self.bg_color.get() and self.bg_color.get() != "#f0f0f0":
+            style["bg"] = self.bg_color.get()
+        if self.fg_color.get() and self.fg_color.get() != "black":
+            style["fg"] = self.fg_color.get()
+            
+        self.result = {
+            "text": button_text,
+            "action": action,
+            "command": command
+        }
+        
+        if style:
+            self.result["style"] = style
+            
+        self.dialog.destroy()
+        
+    def _cancel(self):
+        self.dialog.destroy()
+
+class AddGroupDialog:
+    def __init__(self, parent, unit_type):
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(f"Add New Button Group - {unit_type}")
+        self.dialog.geometry("400x300")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self.unit_type = unit_type
+        self.result = None
+        
+        self._create_widgets()
+        
+        # Center the dialog
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (300 // 2)
+        self.dialog.geometry(f"400x300+{x}+{y}")
+        
+    def _create_widgets(self):
+        # Main frame
+        main_frame = tk.Frame(self.dialog, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Group title
+        tk.Label(main_frame, text="Group Title:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.group_title = tk.Entry(main_frame, width=40)
+        self.group_title.pack(fill=tk.X, pady=(0, 15))
+        
+        # Group description
+        tk.Label(main_frame, text="Group Description:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.group_description = tk.Text(main_frame, height=4, width=40)
+        self.group_description.pack(fill=tk.X, pady=(0, 15))
+        
+        # Buttons
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        tk.Button(button_frame, text="Add Group", command=self._add_group, 
+                 bg="green", fg="white", width=15).pack(side=tk.RIGHT, padx=(10, 0))
+        tk.Button(button_frame, text="Cancel", command=self._cancel, 
+                 bg="red", fg="white", width=15).pack(side=tk.RIGHT)
+        
+    def _add_group(self):
+        title = self.group_title.get().strip()
+        description = self.group_description.get("1.0", tk.END).strip()
+        
+        if not title:
+            messagebox.showerror("Error", "Group title is required!")
+            return
+            
+        self.result = {
+            "title": title,
+            "description": description,
+            "buttons": []
+        }
+        
+        self.dialog.destroy()
+        
+    def _cancel(self):
+        self.dialog.destroy()
 
 class App(tk.Tk):
     def __init__(self, config_path='config.json'):
@@ -18,6 +181,7 @@ class App(tk.Tk):
         self.screen_process = None
         self.current_unit_type = None
         self.buttons_frame = None
+        self.config_path = config_path
 
         if not self._load_config(config_path):
             self.withdraw()
@@ -52,6 +216,16 @@ class App(tk.Tk):
                 messagebox.showerror("Config Error", f"Missing required setting: {setting}")
                 return False
         return True
+
+    def _save_config(self):
+        """Save current configuration to file"""
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Failed to save config file: {e}")
+            return False
 
     def detect_serial_ports(self):
         """Detect available serial ports"""
@@ -97,6 +271,14 @@ class App(tk.Tk):
         self.unit_description = tk.Label(top_frame, text="", fg="gray", font=("Helvetica", 10))
         self.unit_description.pack(side=tk.LEFT, padx=(0, 20))
 
+        # Add command button
+        tk.Button(top_frame, text="+ Add Command", command=self._add_command_dialog,
+                 bg="#4CAF50", fg="white", font=("Helvetica", 9)).pack(side=tk.RIGHT, padx=(0, 10))
+        
+        # Add group button
+        tk.Button(top_frame, text="+ Add Group", command=self._add_group_dialog,
+                 bg="#2196F3", fg="white", font=("Helvetica", 9)).pack(side=tk.RIGHT, padx=(0, 10))
+
         # Main container for buttons (above logs)
         self.buttons_container = tk.Frame(self, padx=10, pady=10)
         self.buttons_container.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -121,6 +303,111 @@ class App(tk.Tk):
 
         # Update unit description
         self._update_unit_description()
+
+    def _add_command_dialog(self):
+        """Open dialog to add a new command button"""
+        if not self.current_unit_type:
+            messagebox.showwarning("Warning", "Please select a unit type first!")
+            return
+            
+        # Get available groups for the current unit type
+        unit_config = self.config['unit_types'].get(self.current_unit_type, {})
+        button_groups = unit_config.get('button_groups', [])
+        
+        if not button_groups:
+            messagebox.showwarning("Warning", "No button groups available. Please add a group first!")
+            return
+            
+        # Create a simple dialog to select group and add command
+        group_dialog = tk.Toplevel(self)
+        group_dialog.title("Select Button Group")
+        group_dialog.geometry("300x200")
+        group_dialog.transient(self)
+        group_dialog.grab_set()
+        
+        # Center the dialog
+        group_dialog.update_idletasks()
+        x = (group_dialog.winfo_screenwidth() // 2) - (300 // 2)
+        y = (group_dialog.winfo_screenheight() // 2) - (200 // 2)
+        group_dialog.geometry(f"300x200+{x}+{y}")
+        
+        main_frame = tk.Frame(group_dialog, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(main_frame, text="Select group to add command:", font=("Helvetica", 10, "bold")).pack(pady=(0, 15))
+        
+        group_var = tk.StringVar(value=button_groups[0]['title'])
+        for group in button_groups:
+            tk.Radiobutton(main_frame, text=group['title'], variable=group_var, 
+                          value=group['title']).pack(anchor="w", pady=2)
+        
+        def open_add_command():
+            selected_group = group_var.get()
+            group_dialog.destroy()
+            
+            # Find the group index
+            group_index = next((i for i, g in enumerate(button_groups) if g['title'] == selected_group), 0)
+            
+            # Open the add command dialog
+            dialog = AddCommandDialog(self, self.current_unit_type, selected_group)
+            self.wait_window(dialog.dialog)
+            
+            if dialog.result:
+                self._add_command_to_group(group_index, dialog.result)
+        
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        tk.Button(button_frame, text="Continue", command=open_add_command,
+                 bg="green", fg="white", width=15).pack(side=tk.RIGHT, padx=(10, 0))
+        tk.Button(button_frame, text="Cancel", command=group_dialog.destroy,
+                 bg="red", fg="white", width=15).pack(side=tk.RIGHT)
+
+    def _add_group_dialog(self):
+        """Open dialog to add a new button group"""
+        if not self.current_unit_type:
+            messagebox.showwarning("Warning", "Please select a unit type first!")
+            return
+            
+        dialog = AddGroupDialog(self, self.current_unit_type)
+        self.wait_window(dialog.dialog)
+        
+        if dialog.result:
+            self._add_button_group(dialog.result)
+
+    def _add_command_to_group(self, group_index, command_data):
+        """Add a new command to an existing button group"""
+        try:
+            # Add the command to the config
+            self.config['unit_types'][self.current_unit_type]['button_groups'][group_index]['buttons'].append(command_data)
+            
+            # Save the config
+            if self._save_config():
+                # Recreate buttons to show the new command
+                self._recreate_buttons()
+                self.log(f"Added new command '{command_data['text']}' to group '{self.config['unit_types'][self.current_unit_type]['button_groups'][group_index]['title']}'", "SUCCESS")
+            else:
+                messagebox.showerror("Error", "Failed to save configuration!")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add command: {e}")
+
+    def _add_button_group(self, group_data):
+        """Add a new button group to the current unit type"""
+        try:
+            # Add the new group to the config
+            self.config['unit_types'][self.current_unit_type]['button_groups'].append(group_data)
+            
+            # Save the config
+            if self._save_config():
+                # Recreate buttons to show the new group
+                self._recreate_buttons()
+                self.log(f"Added new button group '{group_data['title']}'", "SUCCESS")
+            else:
+                messagebox.showerror("Error", "Failed to save configuration!")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add button group: {e}")
 
     def _on_unit_type_change(self, event=None):
         """Handle unit type change from dropdown"""
