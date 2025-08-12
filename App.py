@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import tkinter as tk
-from tkinter import scrolledtext, font, messagebox, ttk, simpledialog
+from tkinter import scrolledtext, font, messagebox, ttk, simpledialog, colorchooser
 import subprocess
 import threading
 import json
@@ -11,15 +11,16 @@ import time
 import glob
 
 class AddCommandDialog:
-    def __init__(self, parent, unit_type, group_title):
+    def __init__(self, parent, unit_type, group_title, group_type):
         self.dialog = tk.Toplevel(parent)
         self.dialog.title(f"Add New Command - {group_title}")
-        self.dialog.geometry("500x400")
+        self.dialog.geometry("500x450")
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
         self.unit_type = unit_type
         self.group_title = group_title
+        self.group_type = group_type  # 'serial' or 'local'
         self.result = None
         
         self._create_widgets()
@@ -27,8 +28,8 @@ class AddCommandDialog:
         # Center the dialog
         self.dialog.update_idletasks()
         x = (self.dialog.winfo_screenwidth() // 2) - (500 // 2)
-        y = (self.dialog.winfo_screenheight() // 2) - (400 // 2)
-        self.dialog.geometry(f"500x400+{x}+{y}")
+        y = (self.dialog.winfo_screenheight() // 2) - (450 // 2)
+        self.dialog.geometry(f"500x450+{x}+{y}")
         
     def _create_widgets(self):
         # Main frame
@@ -40,37 +41,43 @@ class AddCommandDialog:
         self.button_text = tk.Entry(main_frame, width=50)
         self.button_text.pack(fill=tk.X, pady=(0, 15))
         
-        # Action type
-        tk.Label(main_frame, text="Action Type:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.action_var = tk.StringVar(value="send_to_serial")
-        action_frame = tk.Frame(main_frame)
-        action_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        tk.Radiobutton(action_frame, text="Send to Serial", variable=self.action_var, 
-                      value="send_to_serial").pack(side=tk.LEFT, padx=(0, 20))
-        tk.Radiobutton(action_frame, text="Run Local Command", variable=self.action_var, 
-                      value="run_local_command").pack(side=tk.LEFT)
+        # Command type info (read-only)
+        action_text = "Send to Serial" if self.group_type == 'serial' else "Run Local Command"
+        tk.Label(main_frame, text=f"Action Type: {action_text}", 
+                font=("Helvetica", 9), fg="gray").pack(anchor="w", pady=(0, 15))
         
         # Command
         tk.Label(main_frame, text="Command:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
         self.command_text = tk.Text(main_frame, height=4, width=50)
         self.command_text.pack(fill=tk.X, pady=(0, 15))
         
-        # Style options
+        # Style options with visual color picker
         style_frame = tk.LabelFrame(main_frame, text="Button Style (Optional)", padx=10, pady=10)
         style_frame.pack(fill=tk.X, pady=(0, 15))
         
-        # Background color
-        tk.Label(style_frame, text="Background Color:").pack(anchor="w")
-        self.bg_color = tk.Entry(style_frame, width=20)
-        self.bg_color.pack(anchor="w", pady=(0, 5))
+        # Background color with color picker
+        bg_frame = tk.Frame(style_frame)
+        bg_frame.pack(fill=tk.X, pady=(0, 5))
+        tk.Label(bg_frame, text="Background Color:").pack(side=tk.LEFT)
+        self.bg_color = tk.Entry(bg_frame, width=15)
+        self.bg_color.pack(side=tk.LEFT, padx=(10, 5))
         self.bg_color.insert(0, "#f0f0f0")
+        self.bg_preview = tk.Frame(bg_frame, width=30, height=20, bg="#f0f0f0", relief=tk.RAISED, bd=2)
+        self.bg_preview.pack(side=tk.LEFT, padx=(0, 5))
+        tk.Button(bg_frame, text="Pick Color", command=self._pick_bg_color, 
+                 width=10, bg="#e0e0e0").pack(side=tk.LEFT)
         
-        # Text color
-        tk.Label(style_frame, text="Text Color:").pack(anchor="w")
-        self.fg_color = tk.Entry(style_frame, width=20)
-        self.fg_color.pack(anchor="w", pady=(0, 5))
+        # Text color with color picker
+        fg_frame = tk.Frame(style_frame)
+        fg_frame.pack(fill=tk.X, pady=(0, 5))
+        tk.Label(fg_frame, text="Text Color:    ").pack(side=tk.LEFT)
+        self.fg_color = tk.Entry(fg_frame, width=15)
+        self.fg_color.pack(side=tk.LEFT, padx=(10, 5))
         self.fg_color.insert(0, "black")
+        self.fg_preview = tk.Frame(fg_frame, width=30, height=20, bg="black", relief=tk.RAISED, bd=2)
+        self.fg_preview.pack(side=tk.LEFT, padx=(0, 5))
+        tk.Button(fg_frame, text="Pick Color", command=self._pick_fg_color, 
+                 width=10, bg="#e0e0e0").pack(side=tk.LEFT)
         
         # Buttons
         button_frame = tk.Frame(main_frame)
@@ -81,10 +88,25 @@ class AddCommandDialog:
         tk.Button(button_frame, text="Cancel", command=self._cancel, 
                  bg="red", fg="white", width=15).pack(side=tk.RIGHT)
         
+    def _pick_bg_color(self):
+        """Open color picker for background color"""
+        color = colorchooser.askcolor(self.bg_color.get(), title="Choose Background Color")
+        if color[1]:  # color[1] contains the hex value
+            self.bg_color.delete(0, tk.END)
+            self.bg_color.insert(0, color[1])
+            self.bg_preview.config(bg=color[1])
+    
+    def _pick_fg_color(self):
+        """Open color picker for text color"""
+        color = colorchooser.askcolor(self.fg_color.get(), title="Choose Text Color")
+        if color[1]:  # color[1] contains the hex value
+            self.fg_color.delete(0, tk.END)
+            self.fg_color.insert(0, color[1])
+            self.fg_preview.config(bg=color[1])
+        
     def _add_command(self):
         button_text = self.button_text.get().strip()
         command = self.command_text.get("1.0", tk.END).strip()
-        action = self.action_var.get()
         
         if not button_text or not command:
             messagebox.showerror("Error", "Button text and command are required!")
@@ -99,7 +121,7 @@ class AddCommandDialog:
             
         self.result = {
             "text": button_text,
-            "action": action,
+            "action": "send_to_serial" if self.group_type == 'serial' else "run_local_command",
             "command": command
         }
         
@@ -145,6 +167,17 @@ class AddGroupDialog:
         self.group_description = tk.Text(main_frame, height=4, width=40)
         self.group_description.pack(fill=tk.X, pady=(0, 15))
         
+        # Group type selection
+        tk.Label(main_frame, text="Group Type:", font=("Helvetica", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.group_type_var = tk.StringVar(value="serial")
+        type_frame = tk.Frame(main_frame)
+        type_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        tk.Radiobutton(type_frame, text="Serial Commands", variable=self.group_type_var, 
+                      value="serial").pack(side=tk.LEFT, padx=(0, 20))
+        tk.Radiobutton(type_frame, text="Local Commands", variable=self.group_type_var, 
+                      value="local").pack(side=tk.LEFT)
+        
         # Buttons
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=(20, 0))
@@ -157,6 +190,7 @@ class AddGroupDialog:
     def _add_group(self):
         title = self.group_title.get().strip()
         description = self.group_description.get("1.0", tk.END).strip()
+        group_type = self.group_type_var.get()
         
         if not title:
             messagebox.showerror("Error", "Group title is required!")
@@ -165,6 +199,7 @@ class AddGroupDialog:
         self.result = {
             "title": title,
             "description": description,
+            "group_type": group_type,
             "buttons": []
         }
         
@@ -345,11 +380,15 @@ class App(tk.Tk):
             selected_group = group_var.get()
             group_dialog.destroy()
             
-            # Find the group index
+            # Find the group index and determine its type
             group_index = next((i for i, g in enumerate(button_groups) if g['title'] == selected_group), 0)
+            selected_group_data = button_groups[group_index]
+            
+            # Determine group type based on existing buttons or group title
+            group_type = self._determine_group_type(selected_group_data)
             
             # Open the add command dialog
-            dialog = AddCommandDialog(self, self.current_unit_type, selected_group)
+            dialog = AddCommandDialog(self, self.current_unit_type, selected_group, group_type)
             self.wait_window(dialog.dialog)
             
             if dialog.result:
@@ -361,7 +400,33 @@ class App(tk.Tk):
         tk.Button(button_frame, text="Continue", command=open_add_command,
                  bg="green", fg="white", width=15).pack(side=tk.RIGHT, padx=(10, 0))
         tk.Button(button_frame, text="Cancel", command=group_dialog.destroy,
-                 bg="red", fg="white", width=15).pack(side=tk.RIGHT)
+                 bg="red", fg="white", width=15).pack(side=tk.RIGHT, padx=(0, 0))
+
+    def _determine_group_type(self, group_data):
+        """Determine if a group is for serial or local commands"""
+        # Check if group has a type specified
+        if 'group_type' in group_data:
+            return group_data['group_type']
+        
+        # Check existing buttons to determine type
+        buttons = group_data.get('buttons', [])
+        if buttons:
+            # If any button has send_to_serial action, it's a serial group
+            if any(btn.get('action') == 'send_to_serial' for btn in buttons):
+                return 'serial'
+            # If any button has run_local_command action, it's a local group
+            elif any(btn.get('action') == 'run_local_command' for btn in buttons):
+                return 'local'
+        
+        # Default based on group title
+        title_lower = group_data['title'].lower()
+        if 'serial' in title_lower or 'command' in title_lower:
+            return 'serial'
+        elif 'local' in title_lower or 'bash' in title_lower or 'terminal' in title_lower:
+            return 'local'
+        else:
+            # Default to serial for unknown groups
+            return 'serial'
 
     def _add_group_dialog(self):
         """Open dialog to add a new button group"""
