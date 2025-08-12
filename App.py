@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import tkinter as tk
-from tkinter import scrolledtext, font, messagebox
+from tkinter import scrolledtext, font, messagebox, ttk
 import subprocess
 import threading
 import json
@@ -16,6 +16,8 @@ class App(tk.Tk):
         
         # Переменная для хранения процесса xterm/screen
         self.screen_process = None
+        self.current_unit_type = None
+        self.buttons_frame = None
 
         if not self._load_config(config_path):
             self.withdraw()
@@ -26,7 +28,7 @@ class App(tk.Tk):
             sys.exit(1)
 
         self.title("Port Control Interface")
-        self.geometry("1000x700")
+        self.geometry("1200x800")
 
         self.default_font = font.nametofont("TkDefaultFont")
         self.default_font.configure(family="Helvetica", size=10)
@@ -73,58 +75,98 @@ class App(tk.Tk):
             return ports
 
     def _create_widgets(self):
-        # Main container for controls
-        controls_container = tk.Frame(self, padx=10, pady=10)
-        controls_container.pack(side=tk.LEFT, fill=tk.Y, anchor='n')
+        # Top frame for unit type selection
+        top_frame = tk.Frame(self, padx=10, pady=10)
+        top_frame.pack(side=tk.TOP, fill=tk.X)
 
-        # Create a canvas with scrollbar for controls
-        canvas = tk.Canvas(controls_container, width=300, height=500)
-        scrollbar = tk.Scrollbar(controls_container, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # Pack the canvas and scrollbar
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # Bind mouse wheel to scroll
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        # Unit type selection
+        tk.Label(top_frame, text="Unit Type:", font=("Helvetica", 11, "bold")).pack(side=tk.LEFT, padx=(0, 10))
         
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.unit_type_var = tk.StringVar()
+        unit_types = list(self.config.get('unit_types', {}).keys())
+        if unit_types:
+            self.unit_type_var.set(unit_types[0])  # Set default
+            self.current_unit_type = unit_types[0]
+        
+        self.unit_dropdown = ttk.Combobox(top_frame, textvariable=self.unit_type_var, 
+                                         values=unit_types, state="readonly", width=20)
+        self.unit_dropdown.pack(side=tk.LEFT, padx=(0, 20))
+        self.unit_dropdown.bind('<<ComboboxSelected>>', self._on_unit_type_change)
 
-        # Add a status bar at the bottom
-        self.status_bar = tk.Label(self, text="Ready", bd=1, relief=tk.SUNKEN, anchor=tk.W)
-        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        # Unit description
+        self.unit_description = tk.Label(top_frame, text="", fg="gray", font=("Helvetica", 10))
+        self.unit_description.pack(side=tk.LEFT, padx=(0, 20))
 
-        output_frame = tk.Frame(self, padx=10, pady=10)
-        output_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        tk.Label(output_frame, text="Local Command Output:").pack(anchor="w")
-        self.output_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, height=10, width=60)
+        # Main container for buttons (above logs)
+        self.buttons_container = tk.Frame(self, padx=10, pady=10)
+        self.buttons_container.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Create initial buttons
+        self._create_buttons()
+
+        # Logs window at the bottom (taking 1/5 of screen height)
+        logs_frame = tk.Frame(self, padx=10, pady=10)
+        logs_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        tk.Label(logs_frame, text="Command Output Logs:", font=("Helvetica", 11, "bold")).pack(anchor="w")
+        self.output_text = scrolledtext.ScrolledText(logs_frame, wrap=tk.WORD, height=8, width=80)
         self.output_text.pack(fill=tk.BOTH, expand=True)
         self.output_text.tag_config("ERROR", foreground="red")
         self.output_text.tag_config("SUCCESS", foreground="green")
         self.output_text.tag_config("WARNING", foreground="orange")
-        
-        for group in self.config.get('button_groups', []):
-            group_frame = tk.LabelFrame(scrollable_frame, text=group['title'], padx=10, pady=10)
-            group_frame.pack(fill=tk.X, pady=5)
+
+        # Add a status bar at the very bottom
+        self.status_bar = tk.Label(self, text="Ready", bd=1, relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Update unit description
+        self._update_unit_description()
+
+    def _on_unit_type_change(self, event=None):
+        """Handle unit type change from dropdown"""
+        new_unit_type = self.unit_type_var.get()
+        if new_unit_type != self.current_unit_type:
+            self.current_unit_type = new_unit_type
+            self._recreate_buttons()
+            self._update_unit_description()
+            self.log(f"Switched to unit type: {new_unit_type}", "SUCCESS")
+
+    def _update_unit_description(self):
+        """Update the unit description label"""
+        if self.current_unit_type:
+            unit_config = self.config['unit_types'].get(self.current_unit_type, {})
+            description = unit_config.get('description', '')
+            self.unit_description.config(text=description)
+
+    def _create_buttons(self):
+        """Create buttons for the current unit type"""
+        if not self.current_unit_type:
+            return
+
+        # Clear existing buttons
+        for widget in self.buttons_container.winfo_children():
+            widget.destroy()
+
+        unit_config = self.config['unit_types'].get(self.current_unit_type, {})
+        button_groups = unit_config.get('button_groups', [])
+
+        # Create a frame for all button groups
+        self.buttons_frame = tk.Frame(self.buttons_container)
+        self.buttons_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Create button groups in a grid layout (3 columns)
+        for i, group in enumerate(button_groups):
+            row = i // 3
+            col = i % 3
+            
+            group_frame = tk.LabelFrame(self.buttons_frame, text=group['title'], padx=10, pady=10)
+            group_frame.grid(row=row, column=col, sticky='nsew', padx=5, pady=5)
 
             if 'description' in group:
                 tk.Label(group_frame, text=group['description'], wraplength=250, justify='left', fg='gray').pack(fill=tk.X, pady=(0,5))
 
-            # Create a frame for buttons with better organization
-            buttons_frame = tk.Frame(group_frame)
-            buttons_frame.pack(fill=tk.X, expand=True)
-
-            for i, btn_config in enumerate(group['buttons']):
+            # Create buttons for this group
+            for j, btn_config in enumerate(group['buttons']):
                 action = btn_config.get('action')
                 callback = None
                 
@@ -138,21 +180,20 @@ class App(tk.Tk):
                 elif action == 'run_local_command':
                     cmd = self._format_command(btn_config.get('command', ''))
                     callback = lambda c=cmd: self.run_in_thread(self._execute_local_command, c)
-                elif action == 'send_bios_key':
-                    key = btn_config.get('key', '')
-                    callback = lambda k=key: self.run_in_thread(self.send_bios_key, k)
 
                 style = btn_config.get('style', {})
                 if callback:
-                    # Organize buttons in rows of 2 for better space utilization
-                    row = i // 2
-                    col = i % 2
-                    btn = tk.Button(buttons_frame, text=btn_config['text'], command=callback, **style)
-                    btn.grid(row=row, column=col, sticky='ew', padx=2, pady=2)
-            
-            # Configure grid weights for even button distribution
-            buttons_frame.grid_columnconfigure(0, weight=1)
-            buttons_frame.grid_columnconfigure(1, weight=1)
+                    btn = tk.Button(group_frame, text=btn_config['text'], command=callback, **style)
+                    btn.pack(fill=tk.X, pady=2)
+
+        # Configure grid weights for even distribution
+        self.buttons_frame.grid_columnconfigure(0, weight=1)
+        self.buttons_frame.grid_columnconfigure(1, weight=1)
+        self.buttons_frame.grid_columnconfigure(2, weight=1)
+
+    def _recreate_buttons(self):
+        """Recreate buttons when unit type changes"""
+        self._create_buttons()
     
     def _format_command(self, command_template):
         return command_template.format(**self.config['settings'])
@@ -189,18 +230,6 @@ class App(tk.Tk):
             self.after(0, self.log, f"Sent: {text_command}", "SUCCESS")
         except Exception as e:
             self.after(0, self.log, f"Error sending to serial: {e}", "ERROR")
-
-    def send_bios_key(self, key):
-        """Send BIOS navigation keys with proper timing"""
-        device = self.config['settings']['serial_device']
-        try:
-            with open(device, 'w') as serial_port:
-                serial_port.write(key)
-                serial_port.flush()
-                time.sleep(0.1)  # Small delay for BIOS processing
-            self.after(0, self.log, f"Sent BIOS key: {key}", "SUCCESS")
-        except Exception as e:
-            self.after(0, self.log, f"Error sending BIOS key: {e}", "ERROR")
 
     def _execute_local_command(self, command):
         self.after(0, self.log, f"▶ Executing: {command}")
